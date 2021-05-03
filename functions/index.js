@@ -45,14 +45,18 @@ app.command("/echo-from-firebase", async ({command, ack, say}) => {
 
 app.command("/verify-contact", async ({command, ack, respond}) => {
   // Acknowledge command request
-  await ack();
+  await ack("Checking for fraudulent contacts..");
 
   const msg = command.text;
   const emailIds = messageParser.extractEmailIdsFromMessage(msg);
   const phoneNumbers = messageParser.extractPhoneNumbersFromMessage(msg);
 
+  if (!emailIds.length && !phoneNumbers.length) {
+    await respond("No email ids or phone numbers given for verification");
+  }
+
   if (emailIds.length) {
-    fraudDB.searchForEmailIds(emailIds).then(
+    await fraudDB.searchForEmailIds(emailIds).then(
         (fraudulentEmailIds) => {
           if (fraudulentEmailIds.length) {
             respond(`Found fraudulent email ids: ${fraudulentEmailIds}`);
@@ -66,12 +70,10 @@ app.command("/verify-contact", async ({command, ack, respond}) => {
           respond("No matching email in fraud db");
         },
     ).catch(console.error);
-  } else {
-    await respond("No email ids given");
   }
 
   if (phoneNumbers.length) {
-    fraudDB.searchForPhoneNumbers(phoneNumbers).then(
+    await fraudDB.searchForPhoneNumbers(phoneNumbers).then(
         (fraudulentPhoneNos) => {
           if (fraudulentPhoneNos.length) {
             respond(`Found fraudulent phone numbers: ${fraudulentPhoneNos}`);
@@ -85,8 +87,6 @@ app.command("/verify-contact", async ({command, ack, respond}) => {
           respond("No matching phone number in fraud db");
         },
     ).catch(console.error);
-  } else {
-    await respond("No phone numbers given");
   }
 });
 
@@ -103,7 +103,7 @@ app.message(async ({message, say}) => {
       msg, blocks);
 
   if (emailIds.length) {
-    fraudDB.searchForEmailIds(emailIds).then((fraudulentEmailIds) => {
+    await fraudDB.searchForEmailIds(emailIds).then((fraudulentEmailIds) => {
       if (fraudulentEmailIds.length) {
         const replyText = `Found fraudulent email ids: ${fraudulentEmailIds}`;
         const toSay = {
@@ -118,7 +118,7 @@ app.message(async ({message, say}) => {
   }
 
   if (phoneNumbers.length) {
-    fraudDB.searchForPhoneNumbers(phoneNumbers).then((fraudPhoneNos) => {
+    await fraudDB.searchForPhoneNumbers(phoneNumbers).then((fraudPhoneNos) => {
       if (fraudPhoneNos.length) {
         const replyText = `Found fraudulent phone numbers: ${fraudPhoneNos}`;
         const toSay = {
