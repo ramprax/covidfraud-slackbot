@@ -11,7 +11,14 @@ const functions = require("firebase-functions");
 
 const covidFraudSlackApp = require("./covidfraud_slack_app");
 
-// This instance is for testing
-// https://{your domain}.cloudfunctions.net/slack/events
-const testSlackApp = covidFraudSlackApp.createApp("slack");
-exports.slack = functions.https.onRequest(testSlackApp);
+if (functions.config().slack_test) {
+  // https://{your domain}.cloudfunctions.net/slack/events
+  const slackTestApp = covidFraudSlackApp.createApp("slack_test");
+  exports.slackTest = functions.https.onRequest(slackTestApp);
+}
+
+if (functions.config().slack) {
+  // https://{your domain}.cloudfunctions.net/slack/events
+  const slackApp = covidFraudSlackApp.createApp("slack");
+  exports.slack = functions.https.onRequest(slackApp);
+}
