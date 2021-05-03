@@ -88,7 +88,7 @@ exports.extractEmailIdsFromMessage = function(txt, blocks) {
   }
   console.log(allEmails);
 
-  return [...new Set(allEmails)]; // make unique
+  return [...new Set(allEmails.map((em) => em.toLowerCase()))];
 };
 
 exports.extractPhoneNumbersFromMessage = function(txt, blocks) {
