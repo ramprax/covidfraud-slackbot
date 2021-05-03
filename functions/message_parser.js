@@ -57,7 +57,8 @@ function extractAllUrlsFromRichTextBlocks(blocks) {
 }
 
 
-exports.extractEmailIdsFromMessage = function(txt, blocks) {
+exports.extractEmailIdsFromMessage = function(origTxt, blocks) {
+  const txt = origTxt.toLowerCase(); // email ids will be in lower-case in db
   const emailPattern = /[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+/g;
   const emailUrlPattern = /<?mailto:([^|>]+)\|?>?/g;
 
@@ -88,10 +89,14 @@ exports.extractEmailIdsFromMessage = function(txt, blocks) {
   }
   console.log(allEmails);
 
-  return [...new Set(allEmails.map((em) => em.toLowerCase()))];
+  return [...new Set(allEmails)];
 };
 
-exports.extractPhoneNumbersFromMessage = function(txt, blocks) {
+exports.extractPhoneNumbersFromMessage = function(origTxt, blocks) {
+  const lines = origTxt.split("\n");
+  const linesNoSpaces = lines.map((line) => line.replace(/ /g, ""));
+  const txt = linesNoSpaces.join("\n");
+
   const phoneNoPattern = /[0-9]{3,}/g;
   const phoneUrlPattern = /<?tel:([^|>]+)\|?>?/g;
 

@@ -44,7 +44,15 @@ exports.createApp = function(appConfigName) {
 
     const msg = command.text;
     const emailIds = messageParser.extractEmailIdsFromMessage(msg);
-    const phoneNumbers = messageParser.extractPhoneNumbersFromMessage(msg);
+
+    let msgWithoutEmails = msg;
+    if (emailIds.length) {
+      emailIds.forEach((em) => {
+        msgWithoutEmails = msgWithoutEmails.replace(new RegExp(em, "gi"), "\n");
+      });
+    }
+    const phoneNumbers = messageParser.extractPhoneNumbersFromMessage(
+        msgWithoutEmails);
 
     if (!emailIds.length && !phoneNumbers.length) {
       await respond("No email ids or phone numbers given for verification");
@@ -106,8 +114,16 @@ exports.createApp = function(appConfigName) {
     const blocks = message.blocks;
 
     const emailIds = messageParser.extractEmailIdsFromMessage(msg, blocks);
+
+    let msgWithoutEmails = msg;
+    if (emailIds.length) {
+      emailIds.forEach((em) => {
+        msgWithoutEmails = msgWithoutEmails.replace(new RegExp(em, "gi"), "\n");
+      });
+    }
+
     const phoneNumbers = messageParser.extractPhoneNumbersFromMessage(
-        msg, blocks);
+        msgWithoutEmails, blocks);
 
     let replyTxt = "";
     if (emailIds.length) {
