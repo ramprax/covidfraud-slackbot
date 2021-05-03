@@ -48,40 +48,30 @@ exports.createApp = function(appConfigName) {
 
     if (!emailIds.length && !phoneNumbers.length) {
       await respond("No email ids or phone numbers given for verification");
+      return;
     }
 
+    let respText = "";
     if (emailIds.length) {
-      await fraudDB.searchForEmailIds(emailIds).then(
-          (fraudulentEmailIds) => {
-            if (fraudulentEmailIds.length) {
-              respond(`Found fraudulent email ids: ${fraudulentEmailIds}`);
-            } else {
-              respond("No matching email in fraud db");
-            }
-          },
-          (result) => {
-            console.warn("No matching email in fraud db");
-            console.warn(result);
-            respond("No matching email in fraud db");
-          },
-      ).catch(console.error);
+      const fraudulentEmailIds = await fraudDB.searchForEmailIds(emailIds);
+      if (fraudulentEmailIds.length) {
+        respText += `\nFound fraudulent email ids: ${fraudulentEmailIds}`;
+      }
     }
 
     if (phoneNumbers.length) {
-      await fraudDB.searchForPhoneNumbers(phoneNumbers).then(
-          (fraudulentPhoneNos) => {
-            if (fraudulentPhoneNos.length) {
-              respond(`Found fraudulent phone numbers: ${fraudulentPhoneNos}`);
-            } else {
-              respond("No matching phone number in fraud db");
-            }
-          },
-          (result) => {
-            console.warn("No matching phone number in fraud db");
-            console.warn(result);
-            respond("No matching phone number in fraud db");
-          },
-      ).catch(console.error);
+      const fraudulentPhoneNos = await fraudDB.searchForPhoneNumbers(
+          phoneNumbers);
+      if (fraudulentPhoneNos.length) {
+        respText += `\nFound fraudulent phone numbers: ${fraudulentPhoneNos}`;
+      }
+    }
+
+    respText = respText.trim();
+    if (respText.length) {
+      await respond(respText);
+    } else {
+      await respond("No fraudulent contact found");
     }
   });
 
@@ -97,38 +87,31 @@ exports.createApp = function(appConfigName) {
     const phoneNumbers = messageParser.extractPhoneNumbersFromMessage(
         msg, blocks);
 
+    let replyTxt = "";
     if (emailIds.length) {
-      await fraudDB.searchForEmailIds(emailIds).then(
-          (fraudEmailIds) => {
-            if (fraudEmailIds.length) {
-              const replyTxt = `Found fraudulent email ids: ${fraudEmailIds}`;
-              const toSay = {
-                "channel": message.channel,
-                "thread_ts": message.ts,
-                "text": replyTxt.trim(),
-                "reply_broadcast": true,
-              };
-              say(toSay);
-            }
-          },
-      ).catch(console.error);
+      const fraudulentEmailIds = await fraudDB.searchForEmailIds(emailIds);
+      if (fraudulentEmailIds.length) {
+        replyTxt += `\nFound fraudulent email ids: ${fraudulentEmailIds}`;
+      }
     }
 
     if (phoneNumbers.length) {
-      await fraudDB.searchForPhoneNumbers(phoneNumbers).then(
-          (fraudPhNos) => {
-            if (fraudPhNos.length) {
-              const replyTxt = `Found fraudulent phone numbers: ${fraudPhNos}`;
-              const toSay = {
-                "channel": message.channel,
-                "thread_ts": message.ts,
-                "text": replyTxt.trim(),
-                "reply_broadcast": true,
-              };
-              say(toSay);
-            }
-          },
-      ).catch(console.error);
+      const fraudulentPhoneNos = await fraudDB.searchForPhoneNumbers(
+          phoneNumbers);
+      if (fraudulentPhoneNos.length) {
+        replyTxt += `\nFound fraudulent phone numbers: ${fraudulentPhoneNos}`;
+      }
+    }
+
+    replyTxt = replyTxt.trim();
+    if (replyTxt.length) {
+      const toSay = {
+        "channel": message.channel,
+        "thread_ts": message.ts,
+        "text": replyTxt,
+        "reply_broadcast": true,
+      };
+      await say(toSay);
     }
   });
 
