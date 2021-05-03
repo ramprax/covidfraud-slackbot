@@ -50,3 +50,14 @@ exports.searchForPhoneNumbers = function(phoneNos) {
   );
 };
 
+exports.searchForBankAccounts = function(bankAccountNos) {
+  return fraudsRef.where("account", "in", bankAccountNos).get().then(
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => {
+          return doc.data();
+        });
+        const fAccounts = data.map((row) => row.account);
+        return [...new Set(fAccounts)];
+      },
+  );
+};

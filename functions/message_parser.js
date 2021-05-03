@@ -124,3 +124,11 @@ exports.extractPhoneNumbersFromMessage = function(txt, blocks) {
 
   return [...new Set(allPhoneNos)]; // make unique
 };
+
+exports.extractPossibleBankAccountsFromMessage = function(txt) {
+  const lowerTxt = txt.toLowerCase();
+  const lines = lowerTxt.split("\n");
+  const wordSplits = lines.map((line) => line.split(/[ ,]+/));
+  const flattennedTxt = wordSplits.flat();
+  return [...new Set(flattennedTxt)];
+};

@@ -75,6 +75,28 @@ exports.createApp = function(appConfigName) {
     }
   });
 
+  app.command("/verify-account", async ({command, ack, respond}) => {
+    // Acknowledge command request
+    await ack("Checking for fraudulent accounts..");
+
+    const msg = command.text;
+    const accounts = messageParser.extractPossibleBankAccountsFromMessage(msg);
+
+    if (!accounts.length) {
+      await respond("No accounts given for verification");
+      return;
+    }
+
+    if (accounts.length) {
+      const fraudulentAccounts = await fraudDB.searchForBankAccounts(accounts);
+      if (fraudulentAccounts.length) {
+        await respond(`Found fraudulent accounts: ${fraudulentAccounts}`);
+      } else {
+        await respond("No fraudulent account found");
+      }
+    }
+  });
+
   app.message(async ({message, say}) => {
     if (message.bot_id || message.hidden) {
       return;
