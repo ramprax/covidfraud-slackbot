@@ -100,9 +100,25 @@ exports.extractPhoneNumbersFromMessage = function(origTxt, blocks) {
   const phoneNoPattern = /[0-9]{3,}/g;
   const phoneUrlPattern = /<?tel:([^|>]+)\|?>?/g;
 
-  const txtPhoneNos = txt.match(phoneNoPattern);
-  const urlPhoneMatches = [...txt.matchAll(phoneUrlPattern)];
+  let txtPhoneNos = [];
+  const origTxtPhoneNos = origTxt.match(phoneNoPattern);
+  const newTxtPhoneNos = txt.match(phoneNoPattern);
+
+  if (origTxtPhoneNos) {
+    txtPhoneNos = txtPhoneNos.concat(origTxtPhoneNos);
+  }
+  if (newTxtPhoneNos) {
+    txtPhoneNos = txtPhoneNos.concat(newTxtPhoneNos);
+  }
+
   const urlPhoneNos = [];
+
+  const urlPhoneMatchesFromOrigTxt = [...origTxt.matchAll(phoneUrlPattern)];
+  urlPhoneMatchesFromOrigTxt.forEach((a) => {
+    urlPhoneNos.push(a[1]);
+  });
+
+  const urlPhoneMatches = [...txt.matchAll(phoneUrlPattern)];
   urlPhoneMatches.forEach((a) => {
     urlPhoneNos.push(a[1]);
   });
