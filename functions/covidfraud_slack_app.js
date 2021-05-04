@@ -8,6 +8,69 @@ const messageParser = require("./message_parser");
 
 const {App, ExpressReceiver} = require("@slack/bolt");
 
+/**
+ *
+ * @param {Array} fraudulentEmailIds
+ * @param {Array} fraudulentPhoneNos
+ * @return {String} responseText
+ */
+function makeResponseText(fraudulentEmailIds, fraudulentPhoneNos) {
+  let respText = "";
+  if (fraudulentEmailIds.length) {
+    respText += `\nFound fraudulent email ids: ${fraudulentEmailIds}`;
+  }
+  if (fraudulentPhoneNos.length) {
+    respText += `\nFound fraudulent phone numbers: ${fraudulentPhoneNos}`;
+  }
+  return respText.trim();
+}
+
+/**
+ *
+ * @param {String} txt
+ * @param {Object} blocks
+ * @return {Object} emailIds and phoneNumbers
+ */
+function extractContactsFromText(txt, blocks) {
+  const emailIds = messageParser.extractEmailIdsFromMessage(txt, blocks);
+
+  let msgWithoutEmails = txt;
+  if (emailIds.length) {
+    emailIds.forEach((em) => {
+      msgWithoutEmails = msgWithoutEmails.replace(new RegExp(em, "gi"), "\n");
+    });
+  }
+  const phoneNumbers = messageParser.extractPhoneNumbersFromMessage(
+      msgWithoutEmails, blocks);
+
+  return {emailIds: emailIds, phoneNumbers: phoneNumbers};
+}
+
+/**
+ *
+ * @param {Array} emailIds
+ * @param {Array} phoneNumbers
+ * @return {Object} fraudulentEmailIds & fraudulentPhoneNumbers
+ */
+async function verifyContacts(emailIds, phoneNumbers) {
+  let fraudulentEmailIds = [];
+  if (emailIds.length) {
+    fraudulentEmailIds = await fraudDB.searchForEmailIds(emailIds);
+  }
+
+  let fraudulentPhoneNumbers = [];
+  if (phoneNumbers.length) {
+    fraudulentPhoneNumbers = await fraudDB.searchForPhoneNumbers(
+        phoneNumbers);
+  }
+
+  return {
+    fraudulentEmailIds: fraudulentEmailIds,
+    fraudulentPhoneNumbers: fraudulentPhoneNumbers,
+  };
+}
+
+
 exports.createApp = function(appConfigName) {
   const expressReceiver = new ExpressReceiver({
     signingSecret: config[appConfigName].signing_secret,
@@ -25,57 +88,42 @@ exports.createApp = function(appConfigName) {
   app.error(console.log);
 
   // Handle `/echo` command invocations
-  app.command("/echo-from-firebase", async ({command, ack, say}) => {
-    // Acknowledge command request
-    await ack();
+  app.command("/echo-from-firebase",
+      async ({command, ack, respond, client}) => {
+        // Acknowledge command request
+        await ack();
 
-    // Requires:
-    // Add chat:write scope
-    //   + invite the bot user to the channel you run this command
-    //
-    // Add chat:write.public
-    //   + run this command in a public channel
-    await say(`You said "${command.text}"`);
-  });
+        // Requires:
+        // Add chat:write scope
+        //   + invite the bot user to the channel you run this command
+        //
+        // Add chat:write.public
+        //   + run this command in a public channel
+        await respond(`You said "${command.text}"`);
+
+        const authTestResp = await client.auth.test();
+        await respond(`Auth test response:
+          OK:${authTestResp.ok}
+          bot_id:${authTestResp.bot_id}`);
+      },
+  );
 
   app.command("/verify-contact", async ({command, ack, respond}) => {
     // Acknowledge command request
     await ack("Checking for fraudulent contacts..");
 
-    const msg = command.text;
-    const emailIds = messageParser.extractEmailIdsFromMessage(msg);
-
-    let msgWithoutEmails = msg;
-    if (emailIds.length) {
-      emailIds.forEach((em) => {
-        msgWithoutEmails = msgWithoutEmails.replace(new RegExp(em, "gi"), "\n");
-      });
-    }
-    const phoneNumbers = messageParser.extractPhoneNumbersFromMessage(
-        msgWithoutEmails);
+    const {emailIds, phoneNumbers} = extractContactsFromText(command.text);
 
     if (!emailIds.length && !phoneNumbers.length) {
       await respond("No email ids or phone numbers given for verification");
       return;
     }
 
-    let respText = "";
-    if (emailIds.length) {
-      const fraudulentEmailIds = await fraudDB.searchForEmailIds(emailIds);
-      if (fraudulentEmailIds.length) {
-        respText += `\nFound fraudulent email ids: ${fraudulentEmailIds}`;
-      }
-    }
+    const {fraudulentEmailIds, fraudulentPhoneNumbers} = await verifyContacts(
+        emailIds, phoneNumbers);
 
-    if (phoneNumbers.length) {
-      const fraudulentPhoneNos = await fraudDB.searchForPhoneNumbers(
-          phoneNumbers);
-      if (fraudulentPhoneNos.length) {
-        respText += `\nFound fraudulent phone numbers: ${fraudulentPhoneNos}`;
-      }
-    }
-
-    respText = respText.trim();
+    const respText = makeResponseText(
+        fraudulentEmailIds, fraudulentPhoneNumbers);
     if (respText.length) {
       await respond(respText);
     } else {
@@ -105,43 +153,28 @@ exports.createApp = function(appConfigName) {
     }
   });
 
-  app.message(async ({message, say}) => {
-    if (message.bot_id || message.hidden) {
+  app.message(async ({message, say, client}) => {
+    if (message.hidden) {
       return;
     }
+    if (message.bot_id) {
+      const authTestResp = await client.auth.test();
+      if (authTestResp.bot_id == message.bot_id) {
+        return;
+      }
+    }
 
-    const msg = message.text;
+    const txt = message.text;
     const blocks = message.blocks;
 
-    const emailIds = messageParser.extractEmailIdsFromMessage(msg, blocks);
+    const {emailIds, phoneNumbers} = extractContactsFromText(txt, blocks);
 
-    let msgWithoutEmails = msg;
-    if (emailIds.length) {
-      emailIds.forEach((em) => {
-        msgWithoutEmails = msgWithoutEmails.replace(new RegExp(em, "gi"), "\n");
-      });
-    }
+    const {fraudulentEmailIds, fraudulentPhoneNumbers} = await verifyContacts(
+        emailIds, phoneNumbers);
 
-    const phoneNumbers = messageParser.extractPhoneNumbersFromMessage(
-        msgWithoutEmails, blocks);
+    const replyTxt = makeResponseText(
+        fraudulentEmailIds, fraudulentPhoneNumbers);
 
-    let replyTxt = "";
-    if (emailIds.length) {
-      const fraudulentEmailIds = await fraudDB.searchForEmailIds(emailIds);
-      if (fraudulentEmailIds.length) {
-        replyTxt += `\nFound fraudulent email ids: ${fraudulentEmailIds}`;
-      }
-    }
-
-    if (phoneNumbers.length) {
-      const fraudulentPhoneNos = await fraudDB.searchForPhoneNumbers(
-          phoneNumbers);
-      if (fraudulentPhoneNos.length) {
-        replyTxt += `\nFound fraudulent phone numbers: ${fraudulentPhoneNos}`;
-      }
-    }
-
-    replyTxt = replyTxt.trim();
     if (replyTxt.length) {
       const toSay = {
         "channel": message.channel,
